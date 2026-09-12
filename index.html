@@ -13,21 +13,24 @@
             --err: #ff0000;        
             --acc: #00ffff;        
         }
-        body {
+        /* Жёстко фиксируем страницу, запрещая её растягивание */
+        html, body {
             background-color: var(--bg);
+            margin: 0;
+            padding: 0;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden; 
+        }
+        body {
             color: var(--glow);
             font-family: 'Courier New', monospace;
             font-size: 16px;       
             font-weight: 700;      
-            margin: 0;
-            padding: 40px 20px;
-            min-height: 100vh;
-            box-sizing: border-box;
             display: flex;
             align-items: center;
             justify-content: center;
-            overflow-x: hidden;
-            transition: background 0.3s, color 0.3s;
+            box-sizing: border-box;
         }
         body::before, body::after {
             content: " ";
@@ -55,35 +58,42 @@
             40%, 80% { transform: translate(4px, -1px); }
         }
         .shake { animation: shake 0.2s ease-in-out 2; }
+        
+        /* ОГРАНИЧЕНИЕ: Коробка терминала теперь имеет фиксированную высоту и подстраивается под экран */
         .terminal-box {
-            width: 100%;
+            width: 95%;
             max-width: 850px;
+            height: 90vh; /* Занимает максимум 90% высоты экрана */
             background: var(--bg-panel);
             border: 2px solid var(--glow-dim); 
             border-radius: 4px;
-            padding: 35px;
+            padding: 25px;
             box-shadow: 0 0 30px rgba(0, 204, 51, 0.15), inset 0 0 20px rgba(0, 204, 51, 0.1);
             backdrop-filter: blur(12px);
             position: relative;
             box-sizing: border-box;
+            display: flex;
+            flex-direction: column; /* Элементы выстраиваются строго друг под другом */
+            overflow: hidden;
         }
         .header {
             color: var(--glow);
             border-bottom: 2px solid rgba(0, 204, 51, 0.25);
-            padding-bottom: 18px;
-            margin-bottom: 25px;
+            padding-bottom: 15px;
+            margin-bottom: 15px;
             font-weight: bold;
             letter-spacing: 1px;
             text-shadow: 0 0 10px rgba(0, 204, 51, 0.6); 
             position: relative;
+            flex-shrink: 0; /* Шапка никогда не сожмётся */
         }
         .hub-logo {
             display: block;
-            width: 200px;           
-            height: 200px;          
+            width: 160px;           
+            height: 160px;          
             object-fit: cover;      
             border-radius: 50%;     
-            margin: 0 auto 20px auto; 
+            margin: 0 auto 10px auto; 
             opacity: 0.98;
             pointer-events: none;
             filter: drop-shadow(0 0 25px var(--glow)); 
@@ -93,7 +103,7 @@
             justify-content: space-around;
             align-items: center;
             width: 100%;
-            margin-bottom: 20px;
+            margin-bottom: 10px;
         }
         .split-logo-box {
             display: flex;
@@ -102,8 +112,8 @@
             width: 45%;
         }
         .split-logo-img {
-            width: 160px;
-            height: 160px;
+            width: 130px;
+            height: 130px;
             object-fit: cover;
             border-radius: 50%;
             pointer-events: none;
@@ -111,14 +121,27 @@
         .split-logo-img.cerb { border: 2px solid #00cc33; filter: drop-shadow(0 0 15px #00cc33); }
         .split-logo-img.tfb { border: 2px solid #ff0000; filter: drop-shadow(0 0 15px #ff0000); }
         .split-logo-label {
-            font-size: 12px;
-            margin-top: 8px;
+            font-size: 11px;
+            margin-top: 4px;
             font-weight: bold;
             letter-spacing: 2px;
         }
+        
+        /* ИСПРАВЛЕНО: Окно вывода логов получило собственный независимый скролл-бокс */
+        #out {
+            flex-grow: 1; /* Забирает всё свободное место в центре рамки */
+            overflow-y: auto; /* Включает вертикальную прокрутку внутри коробки */
+            padding-right: 10px;
+            margin-bottom: 15px;
+        }
+        /* Кастомный минималистичный зелёный скроллбар, чтобы не ломать атмосферу */
+        #out::-webkit-scrollbar { width: 4px; }
+        #out::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.3); }
+        #out::-webkit-scrollbar-thumb { background: var(--glow-dim); border-radius: 2px; }
+
         .line {
-            line-height: 1.6;
-            margin-bottom: 10px;
+            line-height: 1.5;
+            margin-bottom: 8px;
             word-break: break-all;
             white-space: pre-wrap;
             text-shadow: 0 0 4px rgba(0, 204, 51, 0.2); 
@@ -126,10 +149,13 @@
         .input-line {
             display: flex;
             align-items: center;
-            margin-top: 25px;
+            margin-top: auto; /* Строка ввода всегда прижата к нижнему краю рамки */
+            padding-top: 10px;
+            border-top: 1px solid rgba(0, 204, 51, 0.1);
             opacity: 0;
             visibility: hidden;
             transition: opacity 0.2s;
+            flex-shrink: 0;
         }
         .input-line.active { opacity: 1; visibility: visible; }
         .prompt {
@@ -153,7 +179,7 @@
             background: transparent;
             border: none;
             outline: none;
-            cursor: text; /* Разрешаем курсор для ручного фокуса */
+            cursor: text;
             width: 100%;
         }
         .custom-view {
@@ -184,6 +210,7 @@
         .text-tfb { color: #ff0000; text-shadow: 0 0 5px rgba(255, 0, 0, 0.5); }
     </style>
 </head>
+
 <body>
 <div class="terminal-box" id="term">
     <div class="header" id="hd">
@@ -233,10 +260,9 @@ const delay = ms => new Promise(r => setTimeout(r, ms));
 
 let audioCtx = null;
 
-// ИСПРАВЛЕНО: Безопасный вызов звуков только ПОСЛЕ того, как юзер кликнул
 function playBeep(f, t, d) {
     try {
-        if (!audioCtx) return; // Игнорируем писк, если контекст ещё не активирован кликом
+        if (!audioCtx) return; 
         if (audioCtx.state === 'suspended') {
             audioCtx.resume();
         }
@@ -259,14 +285,16 @@ function initAudio() {
     }
 }
 
+// ИСПРАВЛЕНО: Функция теперь крутит именно внутреннее окошко логов, а не страницу сайта!
 function addLine(txt, cls = "") {
     const d = document.createElement('div'); 
     d.className = `line ${cls}`; 
     d.textContent = txt; 
     DOM.out.appendChild(d);
-    window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' }); 
+    DOM.out.scrollTop = DOM.out.scrollHeight; // Железный фокус на самую нижнюю строку
     return d;
 }
+
 // ИСПРАВЛЕНО: Звук убран из цикла печати на этапе старта, чтобы не вешать скрипт
 async function type(txt, cls = "") {
     const d = addLine("", cls);
