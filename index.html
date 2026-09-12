@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CERBERUS // COMBAT TACTICAL NETWORK</title>
+    <style>
+        :root {
+            --glow: #00cc33;       /* Чёткий зелёный цвет прибора ночного видения */
+            --glow-dim: #006611;   /* Тёмно-зелёный хаки для тактических рамок */
+            --bg: #000501;         /* Плотный чёрный фон */
+            --bg-panel: rgba(0, 15, 3, 0.95); /* Полупрозрачный военный дисплей */
+            --err: #ff0000;        /* Красный для критических угроз */
+            --acc: #00ffff;        /* Голубой неон для подтверждённых узлов */
+        }
+        body {
+            background-color: var(--bg);
+            color: var(--glow);
+            font-family: 'Courier New', monospace;
+            font-size: 16px;       
+            font-weight: 700;      
+            margin: 0;
+            padding: 40px 20px;
+            min-height: 100vh;
+            box-sizing: border-box;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow-x: hidden;
+        }
+        body::before, body::after {
+            content: " ";
+            display: block;
+            position: fixed;
+            inset: 0;
+            background: linear-gradient(rgba(0, 204, 51, 0.02) 50%, rgba(0, 0, 0, 0.5) 50%), linear-gradient(90deg, rgba(0, 204, 51, 0.03), rgba(0, 0, 0, 0), rgba(0, 204, 51, 0.03));
+            z-index: 999;
+            background-size: 100% 4px, 6px 100%;
+            pointer-events: none;
+        }
+        body::after {
+            background: linear-gradient(rgba(0, 0, 0, 0) 90%, rgba(0, 204, 51, 0.05) 95%, rgba(0, 0, 0, 0) 100%);
+            background-size: 100% 300%;
+            animation: scanline 7s linear infinite;
+            z-index: 1000;
+        }
+        @keyframes scanline {
+            0% { background-position: 0 -300%; }
+            100% { background-position: 0 300%; }
+        }
+        @keyframes shake {
+            0%, 100% { transform: translate(0, 0); }
+            20%, 60% { transform: translate(-4px, 1px); }
+            40%, 80% { transform: translate(4px, -1px); }
+        }
+        .shake { animation: shake 0.2s ease-in-out 2; }
+        .terminal-box {
+            width: 100%;
+            max-width: 850px;
+            background: var(--bg-panel);
+            border: 2px solid var(--glow-dim); 
+            border-radius: 4px;
+            padding: 35px;
+            box-shadow: 0 0 30px rgba(0, 204, 51, 0.15), inset 0 0 20px rgba(0, 204, 51, 0.1);
+            backdrop-filter: blur(12px);
+            position: relative;
+        }
+        .header {
+            color: var(--glow);
+            border-bottom: 2px solid rgba(0, 204, 51, 0.25);
+            padding-bottom: 18px;
+            margin-bottom: 25px;
+            font-weight: bold;
+            letter-spacing: 1px;
+            text-shadow: 0 0 10px rgba(0, 204, 51, 0.6); 
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+        }
+        .hub-logo {
+            display: block;
+            width: 250px;           /* Массивный размер шапки */
+            height: auto;
+            margin: 0 auto 20px auto; 
+            opacity: 0.98;
+            pointer-events: none;
+            filter: drop-shadow(0 0 25px var(--glow)); 
+        }
+        .line {
+            line-height: 1.6;
+            margin-bottom: 10px;
+            word-break: break-all;
+            white-space: pre-wrap;
+            text-shadow: 0 0 4px rgba(0, 204, 51, 0.2); 
+        }
+        .input-line {
+            display: flex;
+            align-items: center;
+            margin-top: 25px;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.2s;
+        }
+        .input-line.active { opacity: 1; visibility: visible; }
+        .prompt {
+            margin-right: 12px;
+            color: var(--glow);
+            font-weight: bold;
+            flex-shrink: 0;
+            letter-spacing: 1px;
+            text-shadow: 0 0 6px var(--glow);
+        }
+        .input-wrapper {
+            position: relative;
+            flex-grow: 1;
+            display: flex;
+            align-items: center;
+        }
+        input {
+            position: absolute;
+            inset: 0;
+            opacity: 0;
+            background: transparent;
+            border: none;
+            outline: none;
+            cursor: default;
+        }
+        .custom-view {
+            color: #ffffff;        
+            font-family: inherit;
+            font-size: inherit;
+            font-weight: bold;
+            white-space: pre-wrap;
+            display: inline-flex;
+            align-items: center;
+            text-shadow: 0 0 8px rgba(255, 255, 255, 0.6);
+        }
+        .custom-view::after {
+            content: '_';
+            margin-left: 4px;
+            color: var(--glow);     
+            animation: blink 0.8s infinite;
+            text-shadow: 0 0 10px var(--glow);
+        }
+        @keyframes blink {
+            0%, 49% { opacity: 1; }
+            50%, 100% { opacity: 0; }
+        }
+        .error { color: var(--err); font-weight: bold; text-shadow: 0 0 10px rgba(255, 0, 0, 0.6); }
+        .success { color: var(--acc); font-weight: bold; text-shadow: 0 0 10px rgba(0, 255, 255, 0.6); }
+        .gray { color: rgba(0, 204, 51, 0.45); } 
+    </style>
+</head>
+<body>
+<div class="terminal-box" id="term">
+    <div class="header" id="hd">
+        <!-- Твой запрашиваемый файл анимации CERBERUS_logo.gif -->
+        <img src="CERBERUS_logo.gif" class="hub-logo" alt="CERBERUS LOGO">
+        CHVK CERBERUS // HEAVY STRIKE & TACTICAL RECON PROTOCOL
+    </div>
+    <div id="out"></div>
+    <div class="input-line" id="blk">
+        <span class="prompt" id="pr">ENTER ASSIGNMENT PASSKEY:</span>
+        <div class="input-wrapper">
+            <input type="text" id="inp" autocomplete="off" disabled>
+            <div class="custom-view" id="view"></div>
+        </div>
+    </div>
+</div>
+<script>
+const CFG = { 
+    REAL_TOKEN: "brent-outbreak-2026", // Настоящий токен доступа к серверам Церберов
+    SPD: 15 
+};
+const DOM = { 
+    term: document.getElementById('term'), 
+    inp: document.getElementById('inp'), 
+    view: document.getElementById('view'), 
+    out: document.getElementById('out'), 
+    pr: document.getElementById('pr'), 
+    blk: document.getElementById('blk') 
+};
+let step = 'login', isMask = false, dialogueStage = 0, wordTimer = null;
+let strikes = 0; 
+const delay = ms => new Promise(r => setTimeout(r, ms));
+
+let audioCtx = null;
+
+function playBeep(f, t, d) {
+    try {
+        if (!audioCtx) {
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (audioCtx.state === 'suspended') {
+            audioCtx.resume();
+        }
+        const osc = audioCtx.createOscillator();
+        const g = audioCtx.createGain();
+        osc.type = t; 
+        osc.frequency.value = f; 
+        g.gain.setValueAtTime(0.02, audioCtx.currentTime);
+        g.gain.exponentialRampToValueAtTime(0.00001, audioCtx.currentTime + d);
+        osc.connect(g); 
+        g.connect(audioCtx.destination); 
+        osc.start(); 
+        osc.stop(audioCtx.currentTime + d);
+    } catch(e) {}
+}
+
+function addLine(txt, cls = "") {
+    const d = document.createElement('div'); 
+    d.className = `line ${cls}`; 
+    d.textContent = txt; 
+    DOM.out.appendChild(d);
+    window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' }); 
+    return d;
+}
+// Перехват канала Командиром Штурмового отряда при вводе засадного кода 504
+async function triggerAmbushDialogue() {
+    clearTimeout(wordTimer);
+    DOM.blk.classList.remove('active'); DOM.inp.disabled = true;
+    playBeep(480, 'sawtooth', 0.3); playBeep(320, 'sawtooth', 0.3);
+    err("⚠️ КРИТИЧЕСКОЕ ПРЕДУПРЕЖДЕНИЕ: СЕТЕВАЯ ЗАСАДА! ПРИНУДИТЕЛЬНЫЙ ПЕРЕХВАТ КАHАЛА СВЯЗИ ШТУРМОВЫМ ШЛЮЗОМ ЧВК CERBERUS");
+    await delay(1200);
+    await type("[ШТАБ СВЯЗИ]: Зафиксирована авторизация через маркер ловушки 504. Консоль изолирована.", "gray");
+    await type("[БОРЗ]: Отставить панику на частоте. Говорит Командир штурмового отряда ЧВК 'Cerberus', позывной 'Борз'.", "success");
+    await type("[БОРЗ]: Мы — Церберы. Смертельно опасная и эффективная спец. группировка, готовая преодолеть любые преграды ради целей. Наш отряд — главная опора для SHF и ATLANTIS: мы обеспечиваем им лютую огневую поддержку и проводим их через комплексы, потому что мы опытнее и обученнее всех в этой зоне.", "success");
+    await type("[БОРЗ]: Само правительство наняло нас для эвакуации 'Расходников' из Spunk-DShH, и мы взялись за это с максимальной серьезностью. Отвечай на вопросы по нашей дислокации быстро, или Скрамблер выжжет твой терминал. По 15 секунд на этап.", "success");
+    await delay(500);
+    strikes = 0; dialogueStage = 0;
+    nextDialogueStep();
+}
+
+async function nextDialogueStep() {
+    clearTimeout(wordTimer);
+    if (dialogueStage === 0) {
+        await type("\n[БОРЗ]: ВОПРОС 1. В каком конкретно году разворачивается наша текущая спецоперация по ликвидации конкурентов?", "success");
+        addLine("1. В 2024 году", "gray"); addLine("2. В 2025 году", "gray"); addLine("3. В 2026 году", "gray");
+        ask('ВЫБЕРИТЕ ВАРИАНТ (1-3):', 'ambush_choice', false);
+        wordTimer = setTimeout(() => terminalScramblerDie("🚨 СЛИШКОМ ДОЛГОЕ МОЛЧАНИЕ В ЭФИРЕ. СТИРАНИЕ СИСТЕМЫ."), 15000);
+    } 
+    else if (dialogueStage === 1) {
+        await type("\n[БОРЗ]: ВОПРОС 2. В каком горном массиве на территории Казахстана наша разведгруппа обнаружила засекреченный объект?", "success");
+        addLine("1. В Алтайских горах", "gray"); addLine("2. В Уральских горах", "gray"); addLine("3. В Кавказском хребте", "gray");
+        ask('ВЫБЕРИТЕ ВАРИАНТ (1-3):', 'ambush_choice', false);
+        wordTimer = setTimeout(() => terminalScramblerDie("🚨 ТАЙМАУТ ТАКТИЧЕСКОЙ СВЯЗИ. УЗЕЛ УНИЧТОЖЕН."), 15000);
+    }
+    else if (dialogueStage === 2) {
+        await type("\n[БОРЗ]: ВОПРОС 3. Ликвидацию какой именно засекреченной компании-соперника заказала нам крупная европейская биотехнологическая корпорация?", "success");
+        addLine("1. Компания 'Спектр'", "gray"); addLine("2. Компания 'Галоген'", "gray"); addLine("3. Корпорация 'Атлантис'", "gray");
+        ask('ВЫБЕРИТЕ ВАРИАНТ (1-3):', 'ambush_choice', false);
+        wordTimer = setTimeout(() => terminalScramblerDie("🚨 ТАЙМАУТ ТАКТИЧЕСКОЙ СВЯЗИ. УЗЕЛ УНИЧТОЖЕН."), 15000);
+    }
+    else if (dialogueStage === 3) {
+        await type("\n[БОРЗ]: ВОПРОС 4. Какую главную задачу поставил нам правительственный заказчик относительно персонала и оборудования 'Галогена'?", "success");
+        addLine("1. Эвакуировать персонал и законсервировать приборы", "gray"); addLine("2. Уничтожить персонал, оборудование и любые сопутствующие сведения", "gray"); addLine("3. Заключить с ними обоюдный контракт о ненападении", "gray");
+        ask('ВЫБЕРИТЕ ВАРИАНТ (1-3):', 'ambush_choice', false);
+        wordTimer = setTimeout(() => terminalScramblerDie("🚨 ТАЙМАУТ СВЯЗИ. ПОРТ БЛОКИРОВАН."), 15000);
+    }
+    else if (dialogueStage === 4) {
+        await type("\n[БОРЗ]: ВОПРОС 5. Какую ключевую роль наш штурмовой отряд Церберов выполняет для оперативников SHF и ATLANTIS внутри комплексов?", "success");
+        addLine("1. Сбор образцов тканей мутировавших людей", "gray"); addLine("2. Выведение вакцин и медицинская профилактика", "gray"); addLine("3. Огневая поддержка и проводка групп через комплекс из-за нашей максимальной обученности", "gray");
+        ask('ВЫБЕРИТЕ ВАРИАНТ (1-3):', 'ambush_choice', false);
+        wordTimer = setTimeout(() => terminalScramblerDie("🚨 ТАЙМАУТ СВЯЗИ. ПОРТ БЛОКИРОВАН."), 15000);
+    }
+}
+
+async function successAmbushDialogue() {
+    clearTimeout(wordTimer);
+    await type("\n[БОРЗ]: Отличный рапорт! Ты доказал, что знаешь боевые задачи Церберов наизусть и умеешь держать дисциплину.", "success");
+    await type("[БОРЗ]: Слушай боевой токен доступа к закрытой штурмовой сети Cerberus — brent-outbreak-2026", "success");
+    await type("[БОРЗ]: Вводи его на главном экране. Подключайся к системам наведения и приготовься к зачистке 'Галогена'. Отбой!", "success");
+    playBeep(350, 'triangle', 0.5);
+    await delay(3500);
+    DOM.out.innerHTML = "";
+    step = 'login';
+    ask('ENTER ASSIGNMENT PASSKEY:', 'login', false);
+}
+
+// Главное меню бронированных серверов ЧВК «Cerberus» (по коду brent-outbreak-2026)
+async function openSecureLasMenu() {
+    await type("===================================================", "gray");
+    await type("ACCESS GRANTED. CHVK CERBERUS RECON CORE SYSTEM v1.0", "success");
+    await type("ТАКТИЧЕСКИЙ КОНТРОЛЬ НАД БАЗОЙ В АЛТАЙСКИХ ГОРAX УСТАНОВЛЕН.", "success");
+    await type("1. МОНИТОРИНГ ТЕПЛОВИЗОРОВ И ПЕРИМЕТРА ЛАБОРАТОРИИ 'ГАЛОГЕН'", "success");
+    await type("2. СТАТУС ШТУРМОВЫХ ГРУПП И ОГНЕВОЙ ПОДДЕРЖКИ SHF / ATLANTIS", "success");
+    await type("3. РЕЕСТР ПЕРЕХВАЧЕННЫХ РАЗРАБОТОК И СЕКРЕТНЫХ ТРОФЕЕВ", "success");
+    await type("4. ОТКЛЮЧИТЬСЯ ОТ ТАКТИЧЕСКОГО ЦЕНТРА", "success");
+    await type("===================================================", "gray");
+    ask('ENTER COMMAND:', 'las_menu', false);
+}
+DOM.inp.oninput = () => { if(step !== 'game') DOM.view.textContent = isMask ? "*".repeat(DOM.inp.value.length) : DOM.inp.value; };
+DOM.inp.onkeydown = async (e) => {
+    if (e.key !== 'Enter') return;
+    e.preventDefault(); 
+
+    const v = DOM.inp.value, cv = v.trim(); if (!v) return;
+
+    DOM.blk.classList.remove('active'); DOM.inp.disabled = true; 
+    addLine(DOM.pr.textContent + " " + (isMask ? "*".repeat(v.length) : cv), 'success'); 
+    await delay(300);
+    
+    if (step === 'login') {
+        if (cv === '504') {
+            triggerAmbushDialogue(); // Старт тактического допроса Борза
+        } else if (cv === CFG.REAL_TOKEN) {
+            await bar(); // Прогресс-бар дешифрации
+            await openSecureLasMenu(); // Главное меню Церберов
+        } else {
+            err("TACTICAL ENTRY DENIED: INVALID PASSKEY. ACCOUNT SUSPENDED.");
+            await delay(1500); ask('ENTER ASSIGNMENT PASSKEY:', 'login', false);
+        }
+    } 
+    else if (step === 'ambush_choice') {
+        clearTimeout(wordTimer);
+        
+        // ВОПРОС 1: Год (2026)
+        if (dialogueStage === 0) {
+            if (cv === '3') { dialogueStage = 1; nextDialogueStep(); } 
+            else { strikes++; if (strikes >= 2) await terminalScramblerDie("🚨 ТРИБУНАЛ ОКОНЧЕН. ВЫ ЛИКВИДИРОВАНЫ."); else { err("❌ ОШИБКА."); await delay(1000); nextDialogueStep(); } }
+        } 
+        // ВОПРОС 2: Алтайские горы
+        else if (dialogueStage === 1) {
+            if (cv === '1') { dialogueStage = 2; nextDialogueStep(); } 
+            else { strikes++; if (strikes >= 2) await terminalScramblerDie("🚨 ТРИБУНАЛ ОКОНЧЕН. ВЫ ЛИКВИДИРОВАНЫ."); else { err("❌ ОШИБКА."); await delay(1000); nextDialogueStep(); } }
+        }
+        // ВОПРОС 3: Галоген
+        else if (dialogueStage === 2) {
+            if (cv === '2') { dialogueStage = 3; nextDialogueStep(); } 
+            else { strikes++; if (strikes >= 2) await terminalScramblerDie("🚨 ТРИБУНАЛ ОКОНЧЕН. ВЫ ЛИКВИДИРОВАНЫ."); else { err("❌ ОШИБКА."); await delay(1000); nextDialogueStep(); } }
+        }
+        // ВОПРОС 4: Уничтожить персонал и оборудование
+        else if (dialogueStage === 3) {
+            if (cv === '2') { dialogueStage = 4; nextDialogueStep(); } 
+            else { strikes++; if (strikes >= 2) await terminalScramblerDie("🚨 ТРИБУНАЛ ОКОНЧЕН. ВЫ ЛИКВИДИРОВАНЫ."); else { err("❌ ОШИБКА."); await delay(1000); nextDialogueStep(); } }
+        }
+        // ВОПРОС 5: Огневая поддержка и проводка
+        else if (dialogueStage === 4) {
+            if (cv === '3') { successAmbushDialogue(); } 
+            else { await terminalScramblerDie("🚨 [БОРЗ]: Ложь! Ты не знаешь нашу ключевую роль на объекте! Врубаю Скрамблер."); }
+        }
+    }
+    else if (step === 'las_menu') {
+        if (cv === '4') {
+            await type(">>> РАЗРЫВ СВЯЗИ С ТАКТИЧЕСКИМ ЦЕНТРОМ ЧВК CERBERUS...", "gray");
+            await delay(1000); DOM.out.innerHTML = ""; step = 'login';
+            ask('ENTER ASSIGNMENT PASSKEY:', 'login', false);
+        } else if (cv === '1' || cv === '2' || cv === '3') {
+            await type(">>> СИСТЕМА: РАЗДЕЛ ЗАБЛОКИРОВАН. ОЖИДАНИЕ ТАКТИЧЕСКИХ ДАННЫХ ОТ ШТУРМОВЫХ ГРУПП...", "error");
+            await delay(1500); ask('ENTER COMMAND:', 'las_menu', false);
+        } else {
+            err("НЕВЕРНАЯ КОМАНДА."); await delay(1000); ask('ENTER COMMAND:', 'las_menu', false);
+        }
+    }
+};
+document.onclick = () => DOM.inp.disabled || DOM.inp.focus(); 
+window.onload = runBootLogs;
+</script>
+</body>
+</html>
