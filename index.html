@@ -78,15 +78,18 @@
             align-items: center;
             text-align: center;
         }
-        .hub-logo {
+               .hub-logo {
             display: block;
-            width: 250px;           /* Массивный размер шапки */
-            height: auto;
+            width: 250px;           
+            height: 250px;          /* Делаем картинку строго квадратной */
+            object-fit: cover;      /* Центрируем Цербера внутри */
+            border-radius: 50%;     /* ИДЕАЛЬНО СКРУГЛЯЕТ КАНВАС И СРЕЗАЕТ ЧЕРНЫЕ УГЛЫ К ХУЯМ */
             margin: 0 auto 20px auto; 
             opacity: 0.98;
             pointer-events: none;
             filter: drop-shadow(0 0 25px var(--glow)); 
         }
+
         .line {
             line-height: 1.6;
             margin-bottom: 10px;
