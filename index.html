@@ -65,7 +65,7 @@
             box-shadow: 0 0 30px rgba(0, 204, 51, 0.15), inset 0 0 20px rgba(0, 204, 51, 0.1);
             backdrop-filter: blur(12px);
             position: relative;
-            transition: border 0.3s, box-shadow 0.3s;
+            box-sizing: border-box;
         }
         .header {
             color: var(--glow);
@@ -76,9 +76,7 @@
             letter-spacing: 1px;
             text-shadow: 0 0 10px rgba(0, 204, 51, 0.6); 
             position: relative;
-            transition: border-bottom 0.3s;
         }
-        /* ИСПРАВЛЕНО: Срез углов по маске 50% для круглого логотипа Цербера */
         .hub-logo {
             display: block;
             width: 200px;           
@@ -89,9 +87,7 @@
             opacity: 0.98;
             pointer-events: none;
             filter: drop-shadow(0 0 25px var(--glow)); 
-            transition: transform 0.3s;
         }
-        /* НОВЫЙ СТИЛЬ: Контейнер для двух логотипов во время перехвата канала */
         .split-logos-container {
             display: none;
             justify-content: space-around;
@@ -157,7 +153,8 @@
             background: transparent;
             border: none;
             outline: none;
-            cursor: default;
+            cursor: text; /* Разрешаем курсор для ручного фокуса */
+            width: 100%;
         }
         .custom-view {
             color: #ffffff;        
@@ -183,7 +180,6 @@
         .error { color: var(--err); font-weight: bold; text-shadow: 0 0 10px rgba(255, 0, 0, 0.6); }
         .success { color: var(--acc); font-weight: bold; text-shadow: 0 0 10px rgba(0, 255, 255, 0.6); }
         .gray { color: rgba(0, 204, 51, 0.45); } 
-        /* Тактические стили для динамической смены цветов во время перепалки */
         .text-cerberus { color: #00cc33; text-shadow: 0 0 5px rgba(0, 204, 51, 0.5); }
         .text-tfb { color: #ff0000; text-shadow: 0 0 5px rgba(255, 0, 0, 0.5); }
     </style>
@@ -191,10 +187,8 @@
 <body>
 <div class="terminal-box" id="term">
     <div class="header" id="hd">
-        <!-- Стандартный одиночный логотип Церберов -->
         <img src="CERBERUS_logo.gif" class="hub-logo" id="single-logo" alt="CERBERUS LOGO">
         
-        <!-- Скрытый блок двойных логотипов, активируемый при перехвате -->
         <div class="split-logos-container" id="split-logos">
             <div class="split-logo-box">
                 <img src="CERBERUS_logo.gif" class="split-logo-img cerb" alt="CERB">
@@ -239,11 +233,10 @@ const delay = ms => new Promise(r => setTimeout(r, ms));
 
 let audioCtx = null;
 
+// ИСПРАВЛЕНО: Безопасный вызов звуков только ПОСЛЕ того, как юзер кликнул
 function playBeep(f, t, d) {
     try {
-        if (!audioCtx) {
-            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        }
+        if (!audioCtx) return; // Игнорируем писк, если контекст ещё не активирован кликом
         if (audioCtx.state === 'suspended') {
             audioCtx.resume();
         }
@@ -260,6 +253,12 @@ function playBeep(f, t, d) {
     } catch(e) {}
 }
 
+function initAudio() {
+    if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+}
+
 function addLine(txt, cls = "") {
     const d = document.createElement('div'); 
     d.className = `line ${cls}`; 
@@ -268,18 +267,19 @@ function addLine(txt, cls = "") {
     window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' }); 
     return d;
 }
+// ИСПРАВЛЕНО: Звук убран из цикла печати на этапе старта, чтобы не вешать скрипт
 async function type(txt, cls = "") {
     const d = addLine("", cls);
     for (let i = 0; i < txt.length; i++) {
         d.textContent += txt.charAt(i); 
-        if (Math.random() > 0.3) playBeep(550, 'sawtooth', 0.02); 
+        playBeep(550, 'sawtooth', 0.02); 
         await delay(CFG.SPD);
     }
 }
 
-// ИСПРАВЛЕНО: Функция гарантированно вызывается при загрузке страницы
+// ИСПРАВЛЕНО: Убраны все звуковые триггеры при старте, логи побегут 100%
 async function runBootLogs() {
-    DOM.out.innerHTML = ""; // Полная очистка перед стартом
+    DOM.out.innerHTML = ""; 
     const p = [
         "INITIALIZING ARMORED DEFENSE LINE... ONLINE", 
         "CONNECTING CALIBER TURRET LINKS... CONFIGURED", 
@@ -288,11 +288,10 @@ async function runBootLogs() {
         "CRITICAL SECURITY PROTOCOL 'T.F.B' ENGAGED."
     ];
     for (let i = 0; i < p.length; i++) {
-        await delay(100 + Math.random() * 100); 
+        await delay(80 + Math.random() * 80); 
         addLine("[CERBERUS-TACTICAL] | " + p[i], 'gray'); 
-        playBeep(70, 'sawtooth', 0.01);
     }
-    await delay(400); 
+    await delay(300); 
     await type("SYS: MILITARY GATEWAY DETECTED. BARRICADE KEY REQUIRED.", "gray");
     await type("SYS: LETHAL FORCE IS AUTHORIZED FOR INTRUDERS.", "error"); 
     ask('ENTER ASSIGNMENT PASSKEY:', 'login', false);
@@ -345,92 +344,86 @@ async function bar() {
         await delay(45); 
     }
 }
-// НОВАЯ МЕХАНИКА: Радио-баттл между Цербером и T.F.B при вводе 504
+// ОБНОВЛЕНО: Задержки между репликами увеличены, чтобы текст читался комфортно
 async function triggerAmbushDialogue() {
     clearTimeout(wordTimer);
     DOM.blk.classList.remove('active'); DOM.inp.disabled = true;
     playBeep(440, 'sawtooth', 0.3); playBeep(220, 'sawtooth', 0.3);
     err("⚠️ ВНИМАНИЕ: СЕТЕВОЙ ПЕРЕХВАТ! ОБНАРУЖЕНО ПРИНУДИТЕЛЬНОЕ ВНЕДРЕНИЕ СТОРОННЕЙ ЧАСТОТЫ!");
-    await delay(1000);
+    await delay(2000); // Даём 2 секунды прочитать предупреждение
     
-    // Переключаем шапку на разделенный экран (Зелёный + Красный)
     DOM.singleLogo.style.display = 'none';
     DOM.splitLogos.style.display = 'flex';
-    DOM.term.style.border = "2px dashed #ff1111"; // Рамка начинает мигать предупреждением
+    DOM.term.style.border = "2px dashed #ff1111"; 
     DOM.hdTitle.innerHTML = `<span class="text-cerberus">CERBERUS NET</span> // <span class="text-tfb">T.F.B INTERCEPT MODULE</span>`;
 
     await type("[БОРЗ]: Какого хера... Зафиксирована попытка несанкционированного прохода через маркер 504. Кто на частоте?!", "text-cerberus");
-    await delay(800);
+    await delay(3000); // Пауза перед репликой Молота
     
-    // Вклинивается Молот (T.F.B)
     DOM.term.classList.add('shake'); playBeep(180, 'sawtooth', 0.5);
     await type("[МОЛОТ]: Ну чё, вы, ублюдки из Церберов! Недолго ваша блядская глушилка продержалась! Как говно рассыпалась под нашим DDOS-прессом!", "text-tfb");
-    await delay(1000);
+    await delay(3500); // Пауза перед длинным ответом Борза
     
-    // Ответ Борза
     await type("[БОРЗ]: О, тяжелая кавалерия Берсерков на проводе. Ну вам-то, гвардейцам, конечно виднее, что как рассыпается. Нам в штабе уже все уши прожужжали, как вам все мозги начисто выбили вашими ежедневными тренировками. В вас, турелях ходячих, человеческого вообще ни хера не осталось!", "text-cerberus");
-    await delay(1200);
+    await delay(4500); 
     
-    // Молот бесится
     DOM.term.classList.add('shake'); playBeep(160, 'sawtooth', 0.4);
     await type("[МОЛОТ]: Слышь, ты, поводырь хакерский! Наша железная дисциплина этот комплекс зубами держит, пока вы шпионов из Атлантиса за ручку через коридоры водите! Мы вас запеленговали, штурм-группы T.F.B уже выдвигаются к вашему Алтайскому блиндажу!", "text-tfb");
-    await delay(1000);
+    await delay(3500); 
     
-    // Борз вышвыривает его с канала
     await type("[БОРЗ]: Выдвигайтесь-выдвигайтесь, задолбаетесь по заносам ползать. Парень за консолью, держись крепче, сейчас я этих бронелобых с канала выкину к чертям!", "text-cerberus");
-    await delay(800);
+    await delay(2000); 
     
     await type(">>> Инициализация контр-частотного импульса 'WOLF-PURGE'...", "gray");
     playBeep(900, 'square', 0.8);
     DOM.term.classList.add('shake');
-    await delay(1000);
+    await delay(2000); 
     
-    // Возвращаем чистый зелёный интерфейс Церберов
     DOM.splitLogos.style.display = 'none';
     DOM.singleLogo.style.display = 'block';
     DOM.term.style.border = "2px solid var(--glow-dim)";
     DOM.hdTitle.innerHTML = "CHVK CERBERUS // HEAVY STRIKE & TACTICAL RECON PROTOCOL";
     
     await type(">>> Канал успешно очищен от посторонних шумов. Частота T.F.B заблокирована.", "text-cerberus");
-    await delay(500);
+    await delay(2500); 
     
-    // Переходим к основному тесту Борза
     await type("\n[БОРЗ]: Фух, избавились от этой радиоактивной гнили. Так, вернемся к делу. Ты ввёл код 504 — шифр штурмового заслона. Ответишь на вопросы по нашей дислокации — пущу в базу. Соврёшь — Скрамблер сотрет всё. Погнали.", "text-cerberus");
     dialogueStage = 0;
     nextDialogueStep();
 }
 
+// ОБНОВЛЕНО: Таймер увеличен до 35000мс (35 секунд) на каждый вопрос
 async function nextDialogueStep() {
     clearTimeout(wordTimer);
     if (dialogueStage === 0) {
         await type("\n[БОРЗ]: ВОПРОС 1. В каком конкретно году разворачивается наша текущая спецоперация в заснеженных Алтайских горах?", "text-cerberus");
         addLine("1. В 2024 году", "gray"); addLine("2. В 2025 году", "gray"); addLine("3. В 2026 году", "gray");
         ask('ВЫБЕРИТЕ ВАРИАНТ (1-3):', 'ambush_choice', false);
-        wordTimer = setTimeout(() => terminalScramblerDie("🚨 СЛИШКОМ ДОЛГОЕ МОЛЧАНИЕ В ЭФИРЕ. СВЯЗЬ ОБОРВАНА."), 15000);
+        wordTimer = setTimeout(() => terminalScramblerDie("🚨 СЛИШКОМ ДОЛГОЕ МОЛЧАНИЕ В ЭФИРЕ. СВЯЗЬ ОБОРВАНА."), 35000);
     } 
     else if (dialogueStage === 1) {
         await type("\n[БОРЗ]: ВОПРОС 2. В каком горном массиве на территории Казахстана наша разведгруппа обнаружила засекреченный объект?", "text-cerberus");
         addLine("1. В Алтайских горах", "gray"); addLine("2. В Уральских горах", "gray"); addLine("3. В Кавказском хребте", "gray");
         ask('ВЫБЕРИТЕ ВАРИАНТ (1-3):', 'ambush_choice', false);
-        wordTimer = setTimeout(() => terminalScramblerDie("🚨 ТАЙМАУТ СВЯЗИ. ВЫ ОТКЛЮЧЕНЫ."), 15000);
+        wordTimer = setTimeout(() => terminalScramblerDie("🚨 ТАЙМАУТ СВЯЗИ. ВЫ ОТКЛЮЧЕНЫ."), 35000);
     }
     else if (dialogueStage === 2) {
         await type("\n[БОРЗ]: ВОПРОС 3. Ликвидацию какой именно засекреченной компании-соперника заказала нам крупная европейская биотехнологическая корпорация?", "text-cerberus");
-        addLine("1. Компания 'Спектр'", "gray"); addLine("2. Компания 'Галоген'", "gray"); addLine("3. Корпорация 'Атлантис'", "gray");
+        addLine("1. Компания 'Спектр'", "gray"); addLine("2. Company 'Галоген'", "gray"); addLine("3. Корпорация 'Атлантис'", "gray");
         ask('ВЫБЕРИТЕ ВАРИАНТ (1-3):', 'ambush_choice', false);
-        wordTimer = setTimeout(() => terminalScramblerDie("🚨 ТАЙМАУТ СВЯЗИ. ВЫ ОТКЛЮЧЕНЫ."), 15000);
+        wordTimer = setTimeout(() => terminalScramblerDie("🚨 ТАЙМАУТ СВЯЗИ. ВЫ ОТКЛЮЧЕНЫ."), 35000);
     }
     else if (dialogueStage === 3) {
         await type("\n[БОРЗ]: ВОПРОС 4. Какую главную задачу поставил нам правительственный заказчик относительно персонала и оборудования 'Галогена'?", "text-cerberus");
         addLine("1. Эвакуировать персонал и законсервировать приборы", "gray"); addLine("2. Уничтожить персонал, оборудование и любые сопутствующие сведения", "gray"); addLine("3. Заключить с ними обоюдный контракт о ненападении", "gray");
         ask('ВЫБЕРИТЕ ВАРИАНТ (1-3):', 'ambush_choice', false);
-        wordTimer = setTimeout(() => terminalScramblerDie("🚨 ТАЙМАУТ ТРИБУНАЛА."), 15000);
+        wordTimer = setTimeout(() => terminalScramblerDie("🚨 ТАЙМАУТ ТРИБУНАЛА."), 35000);
     }
     else if (dialogueStage === 4) {
         await type("\n[БОРЗ]: ВОПРОС 5. Какую ключевую роль наш штурмовой отряд Церберов выполняет для оперативных групп SHF и ATLANTIS?", "text-cerberus");
         addLine("1. Сбор образцов тканей мутировавших людей", "gray"); addLine("2. Выведение вакцин и медицинская профилактика", "gray"); addLine("3. Огневая поддержка и проводка групп через комплекс из-за нашей максимальной обученности", "gray");
         ask('ВЫБЕРИТЕ ВАРИАНТ (1-3):', 'ambush_choice', false);
-        wordTimer = setTimeout(() => terminalScramblerDie("🚨 ТАЙМАУТ ТРИБУНАЛА."), 15000);
+        wordTimer = setTimeout(() => terminalScramblerDie("🚨 ТАЙМАУТ ТРИБУНАЛА."), 35000);
     }
 }
 
@@ -461,6 +454,7 @@ DOM.inp.oninput = () => { if(step !== 'game') DOM.view.textContent = isMask ? "*
 DOM.inp.onkeydown = async (e) => {
     if (e.key !== 'Enter') return;
     e.preventDefault(); 
+    initAudio(); // Активируем аудио-движок при первом же нажатии Enter
 
     const v = DOM.inp.value, cv = v.trim(); if (!v) return;
 
@@ -470,7 +464,7 @@ DOM.inp.onkeydown = async (e) => {
     
     if (step === 'login') {
         if (cv === '504') {
-            triggerAmbushDialogue(); // Запуск сюжетного радио-махача Борза и Молота
+            triggerAmbushDialogue(); 
         } else if (cv === CFG.REAL_TOKEN) {
             await bar(); 
             await openSecureLasMenu(); 
@@ -481,28 +475,22 @@ DOM.inp.onkeydown = async (e) => {
     } 
     else if (step === 'ambush_choice') {
         clearTimeout(wordTimer);
-        
-        // ВОПРОС 1: Год (2026)
         if (dialogueStage === 0) {
             if (cv === '3') { dialogueStage = 1; nextDialogueStep(); } 
             else { strikes++; if (strikes >= 2) await terminalScramblerDie("🚨 ТРИБУНАЛ ОКОНЧЕН. ВЫ ЛИКВИДИРОВАНЫ."); else { err("❌ ОШИБКА."); await delay(1000); nextDialogueStep(); } }
         } 
-        // ВОПРОС 2: Алтайские горы
         else if (dialogueStage === 1) {
             if (cv === '1') { dialogueStage = 2; nextDialogueStep(); } 
             else { strikes++; if (strikes >= 2) await terminalScramblerDie("🚨 ТРИБУНАЛ ОКОНЧЕН. ВЫ ЛИКВИДИРОВАНЫ."); else { err("❌ ОШИБКА."); await delay(1000); nextDialogueStep(); } }
         }
-        // ВОПРОС 3: Галоген
         else if (dialogueStage === 2) {
             if (cv === '2') { dialogueStage = 3; nextDialogueStep(); } 
             else { strikes++; if (strikes >= 2) await terminalScramblerDie("🚨 ТРИБУНАЛ ОКОНЧЕН. ВЫ ЛИКВИДИРОВАНЫ."); else { err("❌ ОШИБКА."); await delay(1000); nextDialogueStep(); } }
         }
-        // ВОПРОС 4: Уничтожить персонал
         else if (dialogueStage === 3) {
             if (cv === '2') { dialogueStage = 4; nextDialogueStep(); } 
             else { strikes++; if (strikes >= 2) await terminalScramblerDie("🚨 ТРИБУНАЛ ОКОНЧЕН. ВЫ ЛИКВИДИРОВАНЫ."); else { err("❌ ОШИБКА."); await delay(1000); nextDialogueStep(); } }
         }
-        // ВОПРОС 5: Огневая поддержка и проводка
         else if (dialogueStage === 4) {
             if (cv === '3') { successAmbushDialogue(); } 
             else { await terminalScramblerDie("🚨 [БОРЗ]: Ложь! Ты не знаешь нашу ключевую роль на объекте! Ликвидация."); }
@@ -521,12 +509,17 @@ DOM.inp.onkeydown = async (e) => {
         }
     }
 };
-document.onclick = () => DOM.inp.disabled || DOM.inp.focus(); 
 
-// ЖЕСТКИЙ ЗАПУСК: Вызывает логи сразу при первой миллисекунде загрузки файла в браузере!
-window.addEventListener('DOMContentLoaded', () => {
+// Активируем аудио-контекст при клике по экрану, чтобы обойти защиту браузера
+document.onclick = () => {
+    initAudio();
+    if (DOM.inp.disabled === false) DOM.inp.focus();
+};
+
+// Железный мгновенный запуск логов без аудио-зависимости!
+window.onload = () => {
     runBootLogs();
-});
+};
 </script>
 </body>
 </html>
